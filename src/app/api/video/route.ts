@@ -1,200 +1,112 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ZAI from 'z-ai-web-dev-sdk'
-import fs from 'fs/promises'
-import path from 'path'
 
-// Rate limit tracking
-let lastVideoRequest = 0
-const MIN_INTERVAL = 10000 // 10 seconds between requests
+export const runtime = 'nodejs'
 
+// POST - Generate video from text or image
 export async function POST(request: NextRequest) {
   try {
-    // Rate limit check
-    const now = Date.now()
-    if (now - lastVideoRequest < MIN_INTERVAL) {
-      const waitTime = Math.ceil((MIN_INTERVAL - (now - lastVideoRequest)) / 1000)
-      return NextResponse.json({
-        success: false,
-        error: `Rate limited. Please wait ${waitTime} seconds before generating another video.`,
-        retryAfter: waitTime
-      }, { status: 429 })
-    }
-    lastVideoRequest = now
-
     const body = await request.json()
     const { prompt, imageUrl } = body
 
     if (!prompt && !imageUrl) {
-      return NextResponse.json({
-        success: false,
-        error: 'Prompt or image URL is required'
-      }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Prompt or imageUrl is required' },
+        { status: 400 }
+      )
     }
+
+    console.log('[Video API] Generating video with prompt:', prompt?.substring(0, 50))
 
     const zai = await ZAI.create()
 
-    console.log('[Video] Starting generation with prompt:', prompt?.substring(0, 50))
-
-    try {
-      const response = await zai.video.generations.create({
-        prompt: prompt || 'Generate a creative video',
-        quality: 'speed',
-        with_audio: false,
-        ...(imageUrl && { image_url: imageUrl })
+    // Use video generation from Z-AI SDK
+    let result
+    if (imageUrl) {
+      // Image-to-video
+      result = await zai.videos.generations.create({
+        prompt: prompt || 'Animate this image',
+        image: imageUrl
       })
-
-      console.log('[Video] Response:', JSON.stringify(response, null, 2))
-
-      // Check for task ID (async)
-      if (response.id || response.task_id) {
-        const taskId = response.id || response.task_id
-        return NextResponse.json({
-          success: true,
-          taskId: taskId,
-          status: response.task_status || 'PROCESSING',
-          message: 'Video generation started. This takes 1-3 minutes.'
-        })
-      }
-
-      // Direct video URL
-      const videoUrl = response.video_result?.[0]?.url 
-        || response.video_url 
-        || response.url
-        || response.data?.[0]?.url
-
-      if (videoUrl) {
-        try {
-          const videoResponse = await fetch(videoUrl)
-          const arrayBuffer = await videoResponse.arrayBuffer()
-          const buffer = Buffer.from(arrayBuffer)
-          
-          const fileName = `video-${Date.now()}.mp4`
-          const filePath = path.join(process.cwd(), 'public', fileName)
-          await fs.writeFile(filePath, buffer)
-          
-          return NextResponse.json({
-            success: true,
-            videoUrl: `/${fileName}`,
-            status: 'completed'
-          })
-        } catch {
-          return NextResponse.json({
-            success: true,
-            videoUrl: videoUrl,
-            status: 'completed'
-          })
-        }
-      }
-
-      return NextResponse.json({
-        success: false,
-        error: 'No video URL in response'
+    } else {
+      // Text-to-video
+      result = await zai.videos.generations.create({
+        prompt: prompt
       })
-
-    } catch (apiError: unknown) {
-      const err = apiError as { message?: string }
-      console.error('[Video] API Error:', err.message)
-      
-      // Handle rate limit from backend
-      if (err.message?.includes('429') || err.message?.includes('rate limit')) {
-        return NextResponse.json({
-          success: false,
-          error: 'Backend rate limit reached. Please try again in a few minutes.',
-          retryAfter: 60
-        }, { status: 429 })
-      }
-
-      return NextResponse.json({
-        success: false,
-        error: err.message || 'Video generation failed'
-      }, { status: 500 })
     }
 
-  } catch (error) {
-    console.error('Video generation error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Video generation failed'
-    }, { status: 500 })
+    console.log('[Video API] Result:', JSON.stringify(result, null, 2))
+
+    if (result.taskId) {
+      // Async task - return taskId for polling
+      return NextResponse.json({
+        success: true,
+        taskId: result.taskId,
+        status: 'processing',
+        message: 'Video generation started. Poll for status.'
+      })
+    }
+
+    if (result.videoUrl || result.data?.[0]?.url) {
+      return NextResponse.json({
+        success: true,
+        videoUrl: result.videoUrl || result.data[0].url,
+        status: 'completed'
+      })
+    }
+
+    return NextResponse.json(
+      { error: 'No video generated' },
+      { status: 500 }
+    )
+
+  } catch (error: unknown) {
+    console.error('[Video API] Error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    )
   }
 }
 
+// GET - Check video status
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const taskId = searchParams.get('taskId')
-
-  if (!taskId) {
-    return NextResponse.json({
-      success: false,
-      error: 'Task ID is required'
-    }, { status: 400 })
-  }
-
   try {
+    const { searchParams } = new URL(request.url)
+    const taskId = searchParams.get('taskId')
+
+    if (!taskId) {
+      return NextResponse.json(
+        { error: 'taskId is required' },
+        { status: 400 }
+      )
+    }
+
     const zai = await ZAI.create()
-    const status = await zai.async.result.query(taskId)
+    
+    const result = await zai.videos.generations.retrieve(taskId)
 
-    console.log('[Video Status] Response for', taskId, ':', status.task_status)
-
-    if (status.task_status === 'SUCCESS') {
-      const videoUrl = status.video_result?.[0]?.url 
-        || status.video_url 
-        || status.url
-
-      if (videoUrl) {
-        try {
-          const videoResponse = await fetch(videoUrl)
-          const arrayBuffer = await videoResponse.arrayBuffer()
-          const buffer = Buffer.from(arrayBuffer)
-          
-          const fileName = `video-${taskId}.mp4`
-          const filePath = path.join(process.cwd(), 'public', fileName)
-          await fs.writeFile(filePath, buffer)
-          
-          return NextResponse.json({
-            success: true,
-            taskId,
-            status: 'completed',
-            videoUrl: `/${fileName}`
-          })
-        } catch {
-          return NextResponse.json({
-            success: true,
-            taskId,
-            status: 'completed',
-            videoUrl: videoUrl
-          })
-        }
-      }
-      
+    if (result.status === 'completed' && result.videoUrl) {
       return NextResponse.json({
         success: true,
-        taskId,
         status: 'completed',
-        message: 'Video ready'
+        videoUrl: result.videoUrl
       })
     }
 
-    if (status.task_status === 'FAIL') {
-      return NextResponse.json({
-        success: false,
-        taskId,
-        status: 'failed',
-        error: 'Video generation failed'
-      })
-    }
-
-    // Still processing
     return NextResponse.json({
       success: true,
-      taskId,
-      status: 'processing',
-      message: 'Video is being generated...'
+      status: result.status || 'processing',
+      progress: result.progress || 0
     })
-  } catch (error) {
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to check status'
-    }, { status: 500 })
+
+  } catch (error: unknown) {
+    console.error('[Video API] Status check error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    )
   }
 }
