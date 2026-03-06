@@ -1,17 +1,26 @@
 # NEXUS OS - Production Docker Image
-# Optimized for Render deployment with PostgreSQL
 
 # Stage 1: Build
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lock* package-lock.json* ./
-RUN npm install -g bun && bun install --frozen-lockfile || npm ci
+# Install bun for faster builds
+RUN npm install -g bun
 
-# Copy source and build
+# Copy package files
+COPY package.json bun.lock* package-lock.json* ./
+
+# Install dependencies
+RUN bun install --frozen-lockfile || npm install
+
+# Copy source code
 COPY . .
+
+# Generate Prisma client
+RUN bunx prisma generate || npx prisma generate
+
+# Build Next.js
 RUN bun run build || npm run build
 
 # Stage 2: Production
@@ -37,10 +46,10 @@ COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
-# Copy entrypoint script
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+# Set ownership
+RUN chown -R nexus:nexus /app
 
 # Environment
 ENV NODE_ENV=production
@@ -58,6 +67,5 @@ EXPOSE 3000
 # Switch to non-root user
 USER nexus
 
-# Start
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["node", "server.js"]
+# Start command with Prisma db push
+CMD ["sh", "-c", "npx prisma generate && npx prisma db push --skip-generate && node server.js"]
