@@ -48,7 +48,7 @@ COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
-# Set ownership
+# Set ownership before switching user
 RUN chown -R nexus:nexus /app
 
 # Environment
@@ -67,6 +67,5 @@ EXPOSE 3000
 # Switch to non-root user
 USER nexus
 
-# Start command - skip prisma on startup, just start server
-# Prisma client is already generated at build time
-CMD ["node", "server.js"]
+# Start command - run prisma db push then start server
+CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
