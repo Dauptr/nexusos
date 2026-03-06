@@ -47,10 +47,6 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/package.json ./package.json
-
-# Install prisma CLI globally for runtime
-RUN npm install -g prisma
 
 # Set ownership
 RUN chown -R nexus:nexus /app
@@ -71,5 +67,6 @@ EXPOSE 3000
 # Switch to non-root user
 USER nexus
 
-# Start command with Prisma db push
-CMD ["sh", "-c", "prisma generate && prisma db push --skip-generate && node server.js"]
+# Start command - skip prisma on startup, just start server
+# Prisma client is already generated at build time
+CMD ["node", "server.js"]
