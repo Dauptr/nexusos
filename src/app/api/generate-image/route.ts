@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
       console.log('[Generate Image] Success! Base64 length:', imageBase64.length);
       return NextResponse.json({
         success: true,
+        imageUrl: `data:image/png;base64,${imageBase64}`,
         image: `data:image/png;base64,${imageBase64}`,
         base64: imageBase64,
         isEdit: isEditMode,
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
       console.log('[Generate Image] Success! Image URL:', imageUrl);
       return NextResponse.json({
         success: true,
+        imageUrl: imageUrl,
         image: imageUrl,
         url: imageUrl,
         isEdit: isEditMode,
