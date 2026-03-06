@@ -13,4 +13,4 @@ services:
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
       - key: ZAI_API_URL
-        value: "https://root-cadillac-attractive-dream.trycloudflare.com/v1"
+        value: "https://api.n-e-x-u-s-o-s.com/v1"
