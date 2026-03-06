@@ -12,3 +12,5 @@ services:
         value: production
       - key: NEXT_TELEMETRY_DISABLED
         value: "1"
+      - key: ZAI_API_URL
+        value: "https://secretary-liberal-combo-controversial.trycloudflare.com/v1"

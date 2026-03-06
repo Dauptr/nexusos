@@ -67,5 +67,6 @@ EXPOSE 3000
 # Switch to non-root user
 USER nexus
 
-# Start command - create z-ai config with all required fields, run prisma, then start server
-CMD ["sh", "-c", "echo '{\"baseUrl\": \"https://api.n-e-x-u-s-o-s.com/v1\", \"apiKey\": \"Z.ai\", \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMzE4Y2FlZWQtNWJhZi00ZDk3LTgxYjctNzI4NDMzMjEyZDVkIiwiY2hhdF9pZCI6Ijg4NDYwNzVkLWE3MWQtNGNkNC04YTMyLTIzZDM2OWFmMjZiZSJ9.5HYwGpY776m5bR8tb25nyo5zYanpvDTdWJjd74SRP8c\", \"chatId\": \"8846075d-a71d-4cd4-8a32-23d369af26be\", \"userId\": \"318caeed-5baf-4d97-81b7-728433212d5d\"}' > /app/.z-ai-config && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
+# Start command - create z-ai config with env var support, run prisma, then start server
+# ZAI_API_URL can be set in Render environment variables
+CMD ["sh", "-c", "echo \"{\\\"baseUrl\\\": \\\"${ZAI_API_URL:-https://secretary-liberal-combo-controversial.trycloudflare.com/v1}\\\", \\\"apiKey\\\": \\\"Z.ai\\\", \\\"token\\\": \\\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMzE4Y2FlZWQtNWJhZi00ZDk3LTgxYjctNzI4NDMzMjEyZDVkIiwiY2hhdF9pZCI6Ijg4NDYwNzVkLWE3MWQtNGNkNC04YTMyLTIzZDM2OWFmMjZiZSJ9.5HYwGpY776m5bR8tb25nyo5zYanpvDTdWJjd74SRP8c\\\", \\\"chatId\\\": \\\"8846075d-a71d-4cd4-8a32-23d369af26be\\\", \\\"userId\\\": \\\"318caeed-5baf-4d97-81b7-728433212d5d\\\"}\" > /app/.z-ai-config && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
