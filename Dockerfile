@@ -67,5 +67,5 @@ EXPOSE 3000
 # Switch to non-root user
 USER nexus
 
-# Start command - run prisma db push then start server
-CMD ["sh", "-c", "node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
+# Start command - create z-ai config from env vars, run prisma, then start server
+CMD ["sh", "-c", "if [ -n \"$ZAI_BASE_URL\" ]; then echo \"{\\\"baseUrl\\\": \\\"$ZAI_BASE_URL\\\", \\\"apiKey\\\": \\\"$ZAI_API_KEY\\\"${ZAI_TOKEN:+, \\\"token\\\": \\\"$ZAI_TOKEN\\\"}}\" > /app/.z-ai-config; fi && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
