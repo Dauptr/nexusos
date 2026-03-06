@@ -6081,11 +6081,17 @@ function ProfilePage({ user, setUser }: { user: User; setUser: (u: User) => void
     if (!avatarPrompt.trim()) return
     setGeneratingAvatar(true)
     try {
+      // Enhanced prompt for better avatar generation
+      const enhancedPrompt = `Professional portrait avatar: ${avatarPrompt}. 
+        High quality digital art style, detailed facial features, artistic lighting, 
+        clean elegant background, centered composition, stylized character portrait, 
+        vibrant colors, smooth rendering, trending on artstation quality.`
+      
       const res = await fetch('/api/generate-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          prompt: `Profile avatar portrait: ${avatarPrompt}, professional headshot style, clean background, high quality`,
+          prompt: enhancedPrompt,
           size: '1024x1024'
         }),
       })
@@ -6103,9 +6109,11 @@ function ProfilePage({ user, setUser }: { user: User; setUser: (u: User) => void
           setShowAvatarGenerator(false)
           setAvatarPrompt('')
         }
+      } else {
+        console.error('Avatar generation failed:', data.error)
       }
-    } catch {
-      console.error('Failed to generate avatar')
+    } catch (err) {
+      console.error('Failed to generate avatar:', err)
     } finally {
       setGeneratingAvatar(false)
     }
