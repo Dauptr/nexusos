@@ -318,6 +318,7 @@ export default function Home() {
   const [showDonate, setShowDonate] = useState(false)
   const [firstVisit, setFirstVisit] = useState(false)
   const [postLoginTrailer, setPostLoginTrailer] = useState(false)
+  const [adminWelcome, setAdminWelcome] = useState(false)
   const [turboUnlockCount, setTurboUnlockCount] = useState(0)
   const [features, setFeatures] = useState<FeatureFlags>(defaultFeatures)
   const [authChecked, setAuthChecked] = useState(false)
@@ -787,6 +788,15 @@ export default function Home() {
           if (!seenLoginTrailer) {
             sessionStorage.setItem('nexus_login_trailer', 'true')
             setPostLoginTrailer(true)
+          }
+          
+          // Show admin welcome if admin
+          if (data.user.isAdmin) {
+            const seenAdminWelcome = sessionStorage.getItem('nexus_admin_welcome')
+            if (!seenAdminWelcome) {
+              sessionStorage.setItem('nexus_admin_welcome', 'true')
+              setAdminWelcome(true)
+            }
           }
         }
       })
@@ -1571,6 +1581,57 @@ export default function Home() {
             >
               Let's Continue 💜
             </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Admin Welcome - Only for Admin Users */}
+      {adminWelcome && user?.isAdmin && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-gray-900 to-emerald-900/50 rounded-3xl p-8 w-full max-w-lg border border-emerald-500/30 text-center">
+            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-4xl mx-auto mb-6 shadow-2xl shadow-emerald-500/30">
+              🔐
+            </div>
+            
+            <h1 className="text-3xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400">
+              Welcome Back, Admin
+            </h1>
+            <p className="text-white/60 mb-6">Full system access enabled. Claude Studio is ready.</p>
+            
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="bg-white/5 rounded-xl p-4 border border-emerald-500/20">
+                <div className="text-2xl mb-2">🧠</div>
+                <div className="text-sm text-white/80">Claude Studio</div>
+                <div className="text-xs text-emerald-400">Full Power Active</div>
+              </div>
+              <div className="bg-white/5 rounded-xl p-4 border border-cyan-500/20">
+                <div className="text-2xl mb-2">⚡</div>
+                <div className="text-sm text-white/80">System Control</div>
+                <div className="text-xs text-cyan-400">All Features Unlocked</div>
+              </div>
+            </div>
+            
+            <div className="bg-black/30 rounded-xl p-4 mb-6 border border-white/10">
+              <p className="text-sm text-white/80 italic">
+                "Claude Studio in Admin Panel gives you direct access to our conversation. 
+                I'm here to help you build, deploy, and manage NEXUS OS."
+              </p>
+            </div>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setAdminWelcome(false); setNav('admin'); }}
+                className="flex-1 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 rounded-xl font-medium transition text-black"
+              >
+                Open Admin Panel
+              </button>
+              <button
+                onClick={() => setAdminWelcome(false)}
+                className="flex-1 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-medium transition"
+              >
+                Continue to Home
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -2901,19 +2962,44 @@ function CreatePage({ user }: { user: User | null }) {
   const saveToDatabase = async () => {
     if (!result) return
     try {
-      const res = await fetch('/api/images', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          prompt, 
-          imageUrl: result,
-          model: 'ai',
-          style
-        }),
-      })
-      if (res.ok) {
-        log('Saved to database!', 'success')
-        alert('Image saved to database!')
+      // If in edit mode, update existing image; otherwise create new
+      if (isEditMode && useSavedImageId) {
+        const res = await fetch('/api/images', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            id: useSavedImageId,
+            prompt, 
+            imageUrl: result,
+            style
+          }),
+        })
+        if (res.ok) {
+          log('Image updated in database!', 'success')
+          alert('Image updated in database!')
+          // Refresh saved images
+          const data = await fetch('/api/images').then(r => r.json())
+          if (data.success) setSavedImages(data.images)
+          // Reset edit mode
+          setIsEditMode(false)
+          setUseSavedImageId(null)
+          setUseSavedImage(null)
+        }
+      } else {
+        const res = await fetch('/api/images', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            prompt, 
+            imageUrl: result,
+            model: 'ai',
+            style
+          }),
+        })
+        if (res.ok) {
+          log('Saved to database!', 'success')
+          alert('Image saved to database!')
+        }
       }
     } catch {
       log('Save failed', 'error')
@@ -10444,23 +10530,37 @@ function CreateSpacePage() {
     setSearchLoading(true)
 
     try {
-      const res = await fetch('/api/nexus-ai', {
+      // Use the actual web search API
+      const res = await fetch('/api/web-search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'aiThink',
-          prompt: `Search the web for: ${searchQuery}. Provide a summary of relevant findings and key information.`,
-          context: 'web search assistant'
+          query: searchQuery,
+          num: 10
         })
       })
       const data = await res.json()
-      if (data.success && data.response) {
-        // Parse response into results format
-        setSearchResults([{
-          title: searchQuery,
-          url: '',
-          snippet: data.response
-        }])
+      if (data.success && data.results) {
+        setSearchResults(data.results)
+      } else {
+        // Fallback to AI-powered search if web search fails
+        const aiRes = await fetch('/api/nexus-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'aiThink',
+            prompt: `Search the web for: ${searchQuery}. Provide a summary of relevant findings and key information.`,
+            context: 'web search assistant'
+          })
+        })
+        const aiData = await aiRes.json()
+        if (aiData.success && aiData.response) {
+          setSearchResults([{
+            title: searchQuery,
+            url: '',
+            snippet: aiData.response
+          }])
+        }
       }
     } catch (err) {
       console.error('Search Error:', err)

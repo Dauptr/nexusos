@@ -1,97 +1,82 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ZAI from 'z-ai-web-dev-sdk'
-import fs from 'fs/promises'
-import path from 'path'
 
+export const runtime = 'nodejs'
+
+// POST - Generate speech from text
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { text, voice = 'alloy' } = body
 
     if (!text || typeof text !== 'string') {
-      return NextResponse.json({
-        success: false,
-        error: 'Text is required'
-      }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Text is required' },
+        { status: 400 }
+      )
     }
 
-    // Validate voice
-    const validVoices = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
-    const selectedVoice = validVoices.includes(voice) ? voice : 'alloy'
+    console.log('[TTS API] Generating speech for text:', text.substring(0, 50))
+    console.log('[TTS API] Voice:', voice)
 
     const zai = await ZAI.create()
 
-    // Generate TTS using z-ai-web-dev-sdk
-    const response = await zai.audio.tts.create({
-      text: text,
-      voice: selectedVoice as 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+    // Use TTS from Z-AI SDK
+    const result = await zai.tts.create({
+      text,
+      voice
     })
 
-    // Check for audio data in response
-    if (response.data && response.data[0]?.base64) {
-      const base64Audio = response.data[0].base64
-      
-      // Save the audio file
-      const fileName = `tts-${Date.now()}.mp3`
-      const filePath = path.join(process.cwd(), 'public', fileName)
-      
-      const buffer = Buffer.from(base64Audio, 'base64')
-      await fs.writeFile(filePath, buffer)
-      
+    console.log('[TTS API] Result type:', typeof result)
+
+    // Handle different response formats
+    if (result.audioUrl) {
       return NextResponse.json({
         success: true,
-        audioUrl: `/${fileName}`,
-        voice: selectedVoice
+        audioUrl: result.audioUrl
       })
     }
 
-    // If audio URL is returned directly
-    if (response.data && response.data[0]?.url) {
-      const audioUrl = response.data[0].url
-      
-      // Download and save locally
-      try {
-        const audioResponse = await fetch(audioUrl)
-        const arrayBuffer = await audioResponse.arrayBuffer()
-        const buffer = Buffer.from(arrayBuffer)
-        
-        const fileName = `tts-${Date.now()}.mp3`
-        const filePath = path.join(process.cwd(), 'public', fileName)
-        await fs.writeFile(filePath, buffer)
-        
-        return NextResponse.json({
-          success: true,
-          audioUrl: `/${fileName}`,
-          voice: selectedVoice
-        })
-      } catch {
-        // Return original URL if saving fails
-        return NextResponse.json({
-          success: true,
-          audioUrl: audioUrl,
-          voice: selectedVoice
-        })
-      }
+    if (result.audio) {
+      return NextResponse.json({
+        success: true,
+        audioUrl: result.audio
+      })
     }
 
-    return NextResponse.json({
-      success: false,
-      error: 'No audio generated'
-    })
+    if (result.base64) {
+      return NextResponse.json({
+        success: true,
+        audioUrl: `data:audio/mp3;base64,${result.base64}`
+      })
+    }
 
-  } catch (error) {
-    console.error('TTS generation error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'TTS generation failed'
-    }, { status: 500 })
+    if (result.data?.[0]?.url) {
+      return NextResponse.json({
+        success: true,
+        audioUrl: result.data[0].url
+      })
+    }
+
+    // If result is a string URL directly
+    if (typeof result === 'string') {
+      return NextResponse.json({
+        success: true,
+        audioUrl: result.startsWith('data:') ? result : `data:audio/mp3;base64,${result}`
+      })
+    }
+
+    return NextResponse.json(
+      { error: 'No audio generated', result: JSON.stringify(result) },
+      { status: 500 }
+    )
+
+  } catch (error: unknown) {
+    console.error('[TTS API] Error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json(
+      { error: errorMessage },
+      { status: 500 }
+    )
   }
-}
-
-export async function GET() {
-  return NextResponse.json({
-    success: true,
-    message: 'TTS API ready',
-    voices: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
-  })
 }
