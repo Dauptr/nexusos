@@ -68,4 +68,4 @@ EXPOSE 3000
 USER nexus
 
 # Start command - create z-ai config from env vars, run prisma, then start server
-CMD ["sh", "-c", "if [ -n \"$ZAI_BASE_URL\" ]; then echo \"{\\\"baseUrl\\\": \\\"$ZAI_BASE_URL\\\", \\\"apiKey\\\": \\\"$ZAI_API_KEY\\\"${ZAI_TOKEN:+, \\\"token\\\": \\\"$ZAI_TOKEN\\\"}}\" > /app/.z-ai-config; fi && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
+CMD ["sh", "-c", "echo \"{\\\"baseUrl\\\": \\\"${ZAI_BASE_URL:-https://api.n-e-x-u-s-o-s.com/v1}\\\", \\\"apiKey\\\": \\\"${ZAI_API_KEY:-Z.ai}\\\"${ZAI_TOKEN:+, \\\"token\\\": \\\"$ZAI_TOKEN\\\"}${ZAI_CHAT_ID:+, \\\"chatId\\\": \\\"$ZAI_CHAT_ID\\\"}${ZAI_USER_ID:+, \\\"userId\\\": \\\"$ZAI_USER_ID\\\"}}\" > /app/.z-ai-config && node ./node_modules/prisma/build/index.js db push --skip-generate --accept-data-loss 2>/dev/null || true && node server.js"]
