@@ -24,13 +24,13 @@ export async function POST(request: NextRequest) {
     let result
     if (imageUrl) {
       // Image-to-video
-      result = await zai.videos.generations.create({
+      result = await zai.video.generations.create({
         prompt: prompt || 'Animate this image',
         image: imageUrl
       })
     } else {
       // Text-to-video
-      result = await zai.videos.generations.create({
+      result = await zai.video.generations.create({
         prompt: prompt
       })
     }
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     const zai = await ZAI.create()
     
-    const result = await zai.videos.generations.retrieve(taskId)
+    const result = await zai.async.result.query(taskId)
 
     if (result.status === 'completed' && result.videoUrl) {
       return NextResponse.json({

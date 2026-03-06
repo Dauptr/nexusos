@@ -446,29 +446,14 @@ Requirements:
       const { prompt, size = '1024x1024' } = data
 
       try {
-        // Use direct fetch to Z-AI API
-        const response = await fetch('https://api.n-e-x-u-s-o-s.com/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMzE4Y2FlZWQtNWJhZi00ZDk3LTgxYjctNzI4NDMzMjEyZDVkIiwiY2hhdF9pZCI6Ijg4NDYwNzVkLWE3MWQtNGNkNC04YTMyLTIzZDM2OWFmMjZiZSJ9.5HYwGpY776m5bR8tb25nyo5zYanpvDTdWJjd74SRP8c',
-            'X-Chat-Id': '8846075d-a71d-4cd4-8a32-23d369af26be',
-            'X-User-Id': '318caeed-5baf-4d97-81b7-728433212d5d',
-            'X-Z-AI-From': 'Z',
-          },
-          body: JSON.stringify({ prompt, size }),
+        // Use Z-AI SDK for image generation
+        const zai = await ZAI.create()
+        const response = await zai.images.generations.create({
+          prompt: prompt,
+          size: size as '1024x1024' | '768x1344' | '864x1152' | '1344x768' | '1152x864' | '1440x720' | '720x1440',
         })
 
-        if (!response.ok) {
-          const errorText = await response.text()
-          return NextResponse.json({ 
-            success: false, 
-            error: `API error: ${response.status} - ${errorText}` 
-          })
-        }
-
-        const result = await response.json()
-        const imageData = result.data?.[0]
+        const imageData = response.data?.[0]
         const imageUrl = imageData?.url
         const base64 = imageData?.base64
 

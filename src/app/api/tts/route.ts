@@ -7,7 +7,7 @@ export const runtime = 'nodejs'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { text, voice = 'alloy' } = body
+    const { text, voice = 'tongtong', speed = 1.0, format = 'wav' } = body
 
     if (!text || typeof text !== 'string') {
       return NextResponse.json(
@@ -21,53 +21,32 @@ export async function POST(request: NextRequest) {
 
     const zai = await ZAI.create()
 
-    // Use TTS from Z-AI SDK
-    const result = await zai.tts.create({
-      text,
-      voice
+    // Use TTS from Z-AI SDK - returns Response object with audio data
+    const response = await zai.audio.tts.create({
+      input: text,
+      voice,
+      speed,
+      response_format: format,
+      stream: false
     })
 
-    console.log('[TTS API] Result type:', typeof result)
+    console.log('[TTS API] Response type:', typeof response)
 
-    // Handle different response formats
-    if (result.audioUrl) {
+    // The response is a Response object with audio data
+    if (response && response.arrayBuffer) {
+      const arrayBuffer = await response.arrayBuffer()
+      const buffer = Buffer.from(new Uint8Array(arrayBuffer))
+      const base64 = buffer.toString('base64')
+      
       return NextResponse.json({
         success: true,
-        audioUrl: result.audioUrl
-      })
-    }
-
-    if (result.audio) {
-      return NextResponse.json({
-        success: true,
-        audioUrl: result.audio
-      })
-    }
-
-    if (result.base64) {
-      return NextResponse.json({
-        success: true,
-        audioUrl: `data:audio/mp3;base64,${result.base64}`
-      })
-    }
-
-    if (result.data?.[0]?.url) {
-      return NextResponse.json({
-        success: true,
-        audioUrl: result.data[0].url
-      })
-    }
-
-    // If result is a string URL directly
-    if (typeof result === 'string') {
-      return NextResponse.json({
-        success: true,
-        audioUrl: result.startsWith('data:') ? result : `data:audio/mp3;base64,${result}`
+        audioUrl: `data:audio/${format};base64,${base64}`,
+        format: format
       })
     }
 
     return NextResponse.json(
-      { error: 'No audio generated', result: JSON.stringify(result) },
+      { error: 'No audio generated' },
       { status: 500 }
     )
 
