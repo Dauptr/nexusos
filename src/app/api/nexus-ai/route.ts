@@ -446,28 +446,54 @@ Requirements:
       const { prompt, size = '1024x1024' } = data
 
       try {
-        const zai = await ZAI.create()
-        const response = await zai.images.generations.create({
-          prompt,
-          size: size as '1024x1024' | '768x1344' | '864x1152' | '1344x768' | '1152x864' | '1440x720' | '720x1440'
+        // Use direct fetch to Z-AI API
+        const response = await fetch('https://api.n-e-x-u-s-o-s.com/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Token': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMzE4Y2FlZWQtNWJhZi00ZDk3LTgxYjctNzI4NDMzMjEyZDVkIiwiY2hhdF9pZCI6Ijg4NDYwNzVkLWE3MWQtNGNkNC04YTMyLTIzZDM2OWFmMjZiZSJ9.5HYwGpY776m5bR8tb25nyo5zYanpvDTdWJjd74SRP8c',
+            'X-Chat-Id': '8846075d-a71d-4cd4-8a32-23d369af26be',
+            'X-User-Id': '318caeed-5baf-4d97-81b7-728433212d5d',
+            'X-Z-AI-From': 'Z',
+          },
+          body: JSON.stringify({ prompt, size }),
         })
 
-        const base64 = response.data[0]?.base64
-        if (!base64) {
-          return NextResponse.json({ success: false, error: 'No image generated' })
+        if (!response.ok) {
+          const errorText = await response.text()
+          return NextResponse.json({ 
+            success: false, 
+            error: `API error: ${response.status} - ${errorText}` 
+          })
         }
 
-        // Save to file
-        const fileName = `generated-${Date.now()}.png`
-        const filePath = `/home/z/my-project/public/${fileName}`
-        const buffer = Buffer.from(base64, 'base64')
-        await fs.writeFile(filePath, buffer)
+        const result = await response.json()
+        const imageData = result.data?.[0]
+        const imageUrl = imageData?.url
+        const base64 = imageData?.base64
 
-        return NextResponse.json({
-          success: true,
-          imageUrl: `/${fileName}`,
-          message: 'Image generated successfully!'
-        })
+        if (imageUrl) {
+          // URL returned - use it directly
+          return NextResponse.json({
+            success: true,
+            imageUrl: imageUrl,
+            message: 'Image generated successfully!'
+          })
+        } else if (base64) {
+          // Base64 returned - save to file
+          const fileName = `generated-${Date.now()}.png`
+          const filePath = `/home/z/my-project/public/${fileName}`
+          const buffer = Buffer.from(base64, 'base64')
+          await fs.writeFile(filePath, buffer)
+
+          return NextResponse.json({
+            success: true,
+            imageUrl: `/${fileName}`,
+            message: 'Image generated successfully!'
+          })
+        } else {
+          return NextResponse.json({ success: false, error: 'No image generated' })
+        }
       } catch (err) {
         return NextResponse.json({
           success: false,
