@@ -1,0 +1,14 @@
+# NEXUS OS Cloudflare Tunnel Configuration
+# Run: cloudflared tunnel login
+# Then: cloudflared tunnel create nexus-os
+# Update the tunnel ID below after creating
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /home/z/my-project/.cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: n-e-x-u-s-o-s.com
+    service: http://localhost:3000
+  - hostname: www.n-e-x-u-s-o-s.com
+    service: http://localhost:3000
+  - service: http_status:404

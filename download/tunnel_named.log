@@ -1,0 +1,24 @@
+2026-03-03T15:55:39Z INF Starting tunnel tunnelID=b9722990-cefe-443e-a9a7-e261283f057d
+2026-03-03T15:55:39Z INF Version 2026.2.0 (Checksum 176746db3be7dc7bd48f3dd287c8930a4645ebb6e6700f883fddda5a4c307c16)
+2026-03-03T15:55:39Z INF GOOS: linux, GOVersion: go1.24.13, GoArch: amd64
+2026-03-03T15:55:39Z INF Settings: map[cred-file:/home/z/.cloudflared/cert.pem credentials-file:/home/z/.cloudflared/cert.pem token:*****]
+2026-03-03T15:55:39Z INF Autoupdate frequency is set autoupdateFreq=86400000
+2026-03-03T15:55:39Z INF Generated Connector ID: 929c3d86-1644-4cc6-977c-6097b3a5b3e8
+2026-03-03T15:55:39Z INF Initial protocol quic
+2026-03-03T15:55:39Z INF ICMP proxy will use 21.0.10.25 as source for IPv4
+2026-03-03T15:55:39Z INF ICMP proxy will use fe80::ac68:e0ff:feff:c0b in zone eth0 as source for IPv6
+2026-03-03T15:55:39Z WRN The user running cloudflared process has a GID (group ID) that is not within ping_group_range. You might need to add that user to a group within that range, or instead update the range to encompass a group the user is already in by modifying /proc/sys/net/ipv4/ping_group_range. Otherwise cloudflared will not be able to ping this network error="Group ID 1001 is not between ping group 0 to 0"
+2026-03-03T15:55:39Z WRN ICMP proxy feature is disabled error="cannot create ICMPv4 proxy: Group ID 1001 is not between ping group 0 to 0 nor ICMPv6 proxy: socket: permission denied"
+2026-03-03T15:55:39Z INF ICMP proxy will use 21.0.10.25 as source for IPv4
+2026-03-03T15:55:39Z INF ICMP proxy will use fe80::ac68:e0ff:feff:c0b in zone eth0 as source for IPv6
+2026-03-03T15:55:39Z INF Starting metrics server on 127.0.0.1:20241/metrics
+2026-03-03T15:55:39Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=0 event=0 ip=198.41.192.37
+2026/03/03 15:55:39 failed to sufficiently increase receive buffer size (was: 208 kiB, wanted: 7168 kiB, got: 416 kiB). See https://github.com/quic-go/quic-go/wiki/UDP-Buffer-Sizes for details.
+2026-03-03T15:55:39Z INF Registered tunnel connection connIndex=0 connection=75a55549-477c-4412-b888-77e1520ad867 event=0 ip=198.41.192.37 location=hkg09 protocol=quic
+2026-03-03T15:55:39Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=1 event=0 ip=198.41.200.43
+2026-03-03T15:55:39Z INF Updated to new configuration config="{\"ingress\":[{\"hostname\":\"n-e-x-u-s-o-s.com\",\"service\":\"http://localhost:3000\"},{\"service\":\"http://localhost:3000\"}],\"warp-routing\":{\"enabled\":false}}" version=5
+2026-03-03T15:55:39Z INF Registered tunnel connection connIndex=1 connection=adec7289-8356-45e5-8cf8-f8cddc07eda2 event=0 ip=198.41.200.43 location=hkg10 protocol=quic
+2026-03-03T15:55:40Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=2 event=0 ip=198.41.200.113
+2026-03-03T15:55:41Z INF Registered tunnel connection connIndex=2 connection=0365cf99-8424-4e51-83cb-d1b318cdc304 event=0 ip=198.41.200.113 location=hkg11 protocol=quic
+2026-03-03T15:55:41Z INF Tunnel connection curve preferences: [X25519MLKEM768 CurveP256] connIndex=3 event=0 ip=198.41.192.77
+2026-03-03T15:55:41Z INF Registered tunnel connection connIndex=3 connection=f5965874-6168-4044-8cea-8c6954209c39 event=0 ip=198.41.192.77 location=hkg01 protocol=quic
