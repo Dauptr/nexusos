@@ -27,6 +27,7 @@ model User {
   sentMessages     P2PMessage[]  @relation("SentMessages")
   receivedMessages P2PMessage[]  @relation("ReceivedMessages")
   createdInvites   InviteLink[]  @relation("CreatedInvites")
+  usedInvites      InviteLink[]  @relation("UsedInvites")
   chatHistory      ChatMessage[]
   generatedImages  GeneratedImage[]
   notifications    Notification[]
@@ -95,6 +96,7 @@ model InviteLink {
   createdById String
   createdBy   User     @relation("CreatedInvites", fields: [createdById], references: [id])
   usedById    String?
+  usedBy      User?    @relation("UsedInvites", fields: [usedById], references: [id])
 }
 
 model ChatMessage {
