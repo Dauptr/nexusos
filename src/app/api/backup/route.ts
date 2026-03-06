@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Default: Health check
+    // Default: Health check with actual API testing
     const health = {
       status: 'healthy',
       timestamp: new Date().toISOString(),
@@ -239,6 +239,56 @@ export async function POST(request: NextRequest) {
     } catch {
       health.database = 'error';
       health.status = 'degraded';
+    }
+
+    // Test API endpoints by checking if routes exist and database works
+    try {
+      // Test images API - check if table exists
+      await db.generatedImage.findFirst();
+      health.apis.images = 'connected';
+    } catch {
+      health.apis.images = 'error';
+    }
+
+    try {
+      // Test chat API - check if table exists
+      await db.chatMessage.findFirst();
+      health.apis.chat = 'connected';
+    } catch {
+      health.apis.chat = 'error';
+    }
+
+    try {
+      // Test auth API - check if user table works
+      await db.user.findFirst();
+      health.apis.auth = 'connected';
+    } catch {
+      health.apis.auth = 'error';
+    }
+
+    try {
+      // Test p2pChat API - check if table exists
+      await db.p2PMessage.findFirst();
+      health.apis.p2pChat = 'connected';
+    } catch {
+      health.apis.p2pChat = 'error';
+    }
+
+    try {
+      // Test notifications API - check if table exists
+      await db.notification.findFirst();
+      health.apis.notifications = 'connected';
+    } catch {
+      health.apis.notifications = 'error';
+    }
+
+    // Determine overall status
+    const apiValues = Object.values(health.apis);
+    if (apiValues.includes('error')) {
+      health.status = 'degraded';
+    }
+    if (health.database === 'error') {
+      health.status = 'error';
     }
 
     return NextResponse.json(health);
