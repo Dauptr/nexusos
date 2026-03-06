@@ -1,9 +1,6 @@
 import { db } from '@/lib/db'
 import { NextRequest, NextResponse } from 'next/server'
-
 import { cookies } from 'next/headers'
-
-
 
 // Generate random invite code
 function generateCode(): string {
@@ -21,6 +18,8 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const code = searchParams.get('code')
     
+    console.log('[Invite API] GET request - code:', code)
+    
     if (code) {
       // Get invite info by code
       const invite = await db.inviteLink.findUnique({
@@ -29,6 +28,8 @@ export async function GET(request: NextRequest) {
           createdBy: { select: { username: true, photoUrl: true } }
         }
       })
+      
+      console.log('[Invite API] Found invite:', invite ? invite.code : 'not found')
       
       if (!invite) {
         return NextResponse.json({ error: 'Invalid invite code' }, { status: 404 })
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
+    console.log('[Invite API] User ID from cookie:', userId)
+    
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -61,10 +64,15 @@ export async function GET(request: NextRequest) {
       }
     })
     
+    console.log('[Invite API] Found invites:', invites.length)
+    
     return NextResponse.json({ success: true, invites })
   } catch (error) {
-    console.error('Invite error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    console.error('[Invite API] Error:', error)
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 })
   }
 }
 
@@ -74,12 +82,16 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
+    console.log('[Invite API] POST request - userId:', userId)
+    
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     
     const body = await request.json()
     const { features } = body
+    
+    console.log('[Invite API] Creating invite with features:', features)
     
     // Generate unique code
     let code = generateCode()
@@ -97,6 +109,8 @@ export async function POST(request: NextRequest) {
       }
     })
     
+    console.log('[Invite API] Created invite:', invite.code)
+    
     return NextResponse.json({ 
       success: true, 
       invite: {
@@ -106,7 +120,79 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Create invite error:', error)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    console.error('[Invite API] Create error:', error)
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 })
+  }
+}
+
+// PUT - Use an invite code (for registration)
+export async function PUT(request: NextRequest) {
+  try {
+    const cookieStore = await cookies()
+    const userId = cookieStore.get('userId')?.value
+    
+    console.log('[Invite API] PUT request - userId:', userId)
+    
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const body = await request.json()
+    const { code } = body
+    
+    if (!code) {
+      return NextResponse.json({ error: 'Invite code required' }, { status: 400 })
+    }
+    
+    const invite = await db.inviteLink.findUnique({
+      where: { code }
+    })
+    
+    if (!invite) {
+      return NextResponse.json({ error: 'Invalid invite code' }, { status: 404 })
+    }
+    
+    if (invite.usedById) {
+      return NextResponse.json({ error: 'Invite code already used' }, { status: 400 })
+    }
+    
+    // Mark invite as used
+    const updatedInvite = await db.inviteLink.update({
+      where: { code },
+      data: {
+        usedById: userId,
+        usedAt: new Date()
+      }
+    })
+    
+    // If invite has features, apply them to user
+    if (invite.features) {
+      const features = JSON.parse(invite.features)
+      const user = await db.user.findUnique({ where: { id: userId } })
+      const existingFeatures = user?.features ? JSON.parse(user.features) : {}
+      const mergedFeatures = { ...existingFeatures, ...features }
+      
+      await db.user.update({
+        where: { id: userId },
+        data: { features: JSON.stringify(mergedFeatures) }
+      })
+    }
+    
+    console.log('[Invite API] Invite used successfully:', code)
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Invite code applied successfully',
+      features: invite.features ? JSON.parse(invite.features) : null
+    })
+  } catch (error) {
+    console.error('[Invite API] Use error:', error)
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, { status: 500 })
   }
 }

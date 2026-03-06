@@ -2,32 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { cookies } from 'next/headers'
 
+export const runtime = 'nodejs'
+
 // GET - Get messages between users
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
-    console.log('[P2P Chat API] GET request - userId from cookie:', userId)
+    console.log('[P2P Chat API] GET request - userId:', userId)
     
     if (!userId) {
-      console.log('[P2P Chat API] Unauthorized - no userId cookie')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', success: false }, { status: 401 })
     }
     
     const { searchParams } = new URL(request.url)
     const otherUserId = searchParams.get('userId')
     
-    console.log('[P2P Chat API] otherUserId param:', otherUserId)
-    
     if (otherUserId) {
       // Get conversation with specific user
-      console.log('[P2P Chat API] Querying messages where:', {
-        or: [
-          { fromUserId: userId, toUserId: otherUserId },
-          { fromUserId: otherUserId, toUserId: userId }
-        ]
-      })
+      console.log('[P2P Chat API] Getting conversation with user:', otherUserId)
       
       const messages = await db.p2PMessage.findMany({
         where: {
@@ -43,25 +37,19 @@ export async function GET(request: NextRequest) {
         }
       })
       
-      console.log('[P2P Chat API] Found messages:', messages.length)
-      if (messages.length > 0) {
-        console.log('[P2P Chat API] First message:', JSON.stringify(messages[0], null, 2))
-      }
-      
       // Mark as read
-      const updateResult = await db.p2PMessage.updateMany({
+      await db.p2PMessage.updateMany({
         where: {
           fromUserId: otherUserId,
           toUserId: userId,
           read: false
         },
         data: { read: true }
-      })
-      console.log('[P2P Chat API] Marked as read:', updateResult.count, 'messages')
+      }).catch(() => {})
       
       return NextResponse.json({ success: true, messages })
     } else {
-      // Get all conversations (latest message per user)
+      // Get all conversations
       const sentMessages = await db.p2PMessage.findMany({
         where: { fromUserId: userId },
         orderBy: { createdAt: 'desc' },
@@ -78,15 +66,12 @@ export async function GET(request: NextRequest) {
         }
       })
       
-      // Get unread count
       const unreadCount = await db.p2PMessage.count({
         where: { toUserId: userId, read: false }
       })
       
-      console.log('[P2P Chat API] Summary - Sent:', sentMessages.length, 'Received:', receivedMessages.length, 'Unread:', unreadCount)
-      
       // Combine and deduplicate users
-      const conversations = new Map()
+      const conversations = new Map<string, { user: { id: string; username: string; photoUrl: string | null }; lastMessage: string; lastMessageTime: Date; unread: boolean }>()
       
       sentMessages.forEach(msg => {
         if (!conversations.has(msg.toUserId)) {
@@ -118,8 +103,12 @@ export async function GET(request: NextRequest) {
       })
     }
   } catch (error) {
-    console.error('[P2P Chat API] Error:', error)
-    return NextResponse.json({ error: 'Server error', details: String(error) }, { status: 500 })
+    console.error('[P2P Chat API] GET Error:', error)
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      success: false 
+    }, { status: 500 })
   }
 }
 
@@ -129,21 +118,32 @@ export async function POST(request: NextRequest) {
     const cookieStore = await cookies()
     const userId = cookieStore.get('userId')?.value
     
-    console.log('[P2P Chat API] POST request - userId from cookie:', userId)
+    console.log('[P2P Chat API] POST request - userId:', userId)
     
     if (!userId) {
-      console.log('[P2P Chat API] Unauthorized - no userId cookie')
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized', success: false }, { status: 401 })
     }
     
     const body = await request.json()
     const { toUserId, content } = body
     
-    console.log('[P2P Chat API] Creating message - from:', userId, 'to:', toUserId, 'content:', content?.substring(0, 50))
-    
     if (!toUserId || !content?.trim()) {
-      console.log('[P2P Chat API] Missing fields - toUserId:', toUserId, 'content:', content)
-      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Missing toUserId or content', 
+        success: false 
+      }, { status: 400 })
+    }
+    
+    // Verify recipient exists
+    const recipient = await db.user.findUnique({
+      where: { id: toUserId }
+    })
+    
+    if (!recipient) {
+      return NextResponse.json({ 
+        error: 'Recipient not found', 
+        success: false 
+      }, { status: 404 })
     }
     
     const message = await db.p2PMessage.create({
@@ -159,26 +159,24 @@ export async function POST(request: NextRequest) {
     })
     
     console.log('[P2P Chat API] Message created:', message.id)
-    console.log('[P2P Chat API] Message details:', JSON.stringify(message, null, 2))
     
     // Create notification for recipient
-    try {
-      await db.notification.create({
-        data: {
-          userId: toUserId,
-          type: 'message',
-          title: 'New Message',
-          message: `You have a new message from ${message.fromUser.username}`,
-        }
-      })
-      console.log('[P2P Chat API] Notification created for recipient:', toUserId)
-    } catch (notifError) {
-      console.error('[P2P Chat API] Failed to create notification:', notifError)
-    }
+    await db.notification.create({
+      data: {
+        userId: toUserId,
+        type: 'message',
+        title: 'New Message',
+        message: `New message from ${message.fromUser.username}`,
+      }
+    }).catch(() => {})
     
     return NextResponse.json({ success: true, message })
   } catch (error) {
-    console.error('[P2P Chat API] Send message error:', error)
-    return NextResponse.json({ error: 'Server error', details: String(error) }, { status: 500 })
+    console.error('[P2P Chat API] POST Error:', error)
+    return NextResponse.json({ 
+      error: 'Server error', 
+      details: error instanceof Error ? error.message : 'Unknown error',
+      success: false 
+    }, { status: 500 })
   }
 }
